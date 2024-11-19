@@ -1,6 +1,10 @@
 <?php
 session_start();
 
+echo '<pre>';
+print_r($_SERVER);
+echo '</pre>';
+
 $trouverMot = ['SEMILLANT', 'COLLINAIRE', 'DAMASQUINE', 'CHASUBLE', 'HIEMALE', 'EXHAUSTEUR', 'PERCLUS', 'PETRICHOR', 'IMMARCESCIBLE', 'CALLIPYGE', 'OBJURGATION', 'DYSTOPIE', 'PENDRILLON', 'ASSUETUDE', 'VERBATIM', 'BERGAMASQUE', 'ANONCHALIR', 'COMPENDIEUX'];
 
 $nombreEssais = 5;
@@ -16,6 +20,10 @@ if (!isset($_SESSION['partieGagnee'])) {
     $_SESSION['partieGagnee'] = false;
 }
 
+if (!isset($_SESSION['premiereEtDerniereLettres'])) {
+    $_SESSION['premiereEtDerniereLettres'] = [];
+}
+
 if (isset($_POST['nouveauMot']) || !isset($_SESSION['motAleatoire'])) {
     $numeroMotAleatoire = array_rand($trouverMot);
     $motAleatoire = $trouverMot[$numeroMotAleatoire];
@@ -23,27 +31,26 @@ if (isset($_POST['nouveauMot']) || !isset($_SESSION['motAleatoire'])) {
     $_SESSION['essaisRestants'] = $nombreEssais;
     $_SESSION['lettresProposees'] = [];
     $_SESSION['lettresTrouvees'] = [];
+    $_SESSION['premiereEtDerniereLettres'] = [];
     
     $premiereLettre = $motAleatoire[0];
     $derniereLettre = $motAleatoire[strlen($motAleatoire) - 1];
+    $_SESSION['premiereEtDerniereLettres'][] = $premiereLettre;
+    $_SESSION['premiereEtDerniereLettres'][] = $derniereLettre;
     
-        // $_SESSION['lettresTrouvees'][] = $premiereLettre;
-        // $_SESSION['lettresProposees'][] = $premiereLettre;
-        // $_SESSION['lettresTrouvees'][] = $derniereLettre;
-        // $_SESSION['lettresProposees'][] = $derniereLettre;
-
     $_SESSION['partieGagnee'] = false;
 } else {
     $motAleatoire = $_SESSION['motAleatoire'];
 }
 
+echo '<pre>';
+print_r($_SESSION['premiereEtDerniereLettres']);
+echo '</pre>';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proposition'])) {
-        $proposition = strtoupper($_POST['proposition']);
+    $proposition = strtoupper($_POST['proposition']);
+
     if (strlen($proposition) > 1) {
-        // if ($proposition == $motAleatoire) {
-        //     $_SESSION['partieGagnee'] = true;
-        //     $success = "Bravo ! Vous avez trouvé le bon mot !";
-        // } 
         if ($proposition == $motAleatoire) {
             $_SESSION['partieGagnee'] = true;
             $success = "Bravo ! Vous avez trouvé le bon mot !";
@@ -68,10 +75,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['proposition'])) {
             }
         }
     }
+
+    if (in_array($proposition, $_SESSION['premiereEtDerniereLettres'])) {
+        if (strpos($motAleatoire, $proposition) !== false && !in_array($proposition, $_SESSION['lettresTrouvees'])) {
+            $_SESSION['lettresTrouvees'][] = $proposition;
+        } else {
+            $_SESSION['essaisRestants']--;
+            $error = "La lettre proposée est déjà affichée. Il vous reste " . $_SESSION['essaisRestants'] . " essais.";
+        }
+    } else {
+        if (strpos($motAleatoire, $proposition) !== false) {
+            $_SESSION['lettresTrouvees'][] = $proposition;
+        } else {
+            $_SESSION['essaisRestants']--;
+            $error = "La lettre proposée n'est pas dans le mot recherché. Il vous reste " . $_SESSION['essaisRestants'] . " essais.";
+        }
+    }
 }
 
+echo '<pre>';
+print_r($_SESSION['lettresTrouvees']);
+echo '</pre>';
+
 $lettres = str_split($motAleatoire);
-if (count(array_diff(str_split($motAleatoire), $_SESSION['lettresTrouvees'])) === 0) {
+
+if (count($lettres) >= 2) {
+    array_shift($lettres);
+    array_pop($lettres);
+}
+
+$lettresUniques = array_unique($lettres);
+
+echo '<pre>';
+print_r($lettresUniques);
+echo '</pre>';
+
+if (count(array_diff($lettresUniques, $_SESSION['lettresTrouvees'])) === 0) {
     $_SESSION['partieGagnee'] = true;
     $success = "Bravo ! Vous avez trouvé toutes les lettres ! Le mot était bien : " . $motAleatoire;
 }
@@ -99,36 +138,22 @@ if ($_SESSION['essaisRestants'] <= 0) {
     </div>
     <hr>
     <div class="d-grid justify-content-center">
-    <!-- <p class="h2"> -->
-        <?php
-            // for ($i = 0; $i < strlen($motAleatoire); $i++) {
-            //     if (in_array($motAleatoire[$i], $_SESSION['lettresTrouvees'])) {
-            //         echo $motAleatoire[$i] . ' ';
-            //     } else {
-            //         echo '_ ';
-            //     }
-            //     if ($premiereLettre == "_ " && $derniereLettre == "_ ") {
-            //         echo $motAleatoire[0];
-            //         echo $motAleatoire[$motAleatoire[strlen($motAleatoire) - 1]];
-            //     }
-            // }
-        ?>
         <p class="h2">
-    <?php
-        for ($i = 0; $i < strlen($motAleatoire); $i++) {
-            if (
-                ($i == 0 && $motAleatoire[$i] == $motAleatoire[0]) || // Première lettre
-                ($i == strlen($motAleatoire) - 1 && $motAleatoire[$i] == $motAleatoire[strlen($motAleatoire) - 1]) || // Dernière lettre
-                in_array($motAleatoire[$i], $_SESSION['lettresTrouvees']) // Lettre trouvée
-            ) {
-                echo $motAleatoire[$i] . ' ';
-            } else {
-                echo '_ ';
+        <?php
+            for ($i = 0; $i < strlen($motAleatoire); $i++) {
+                // Affiche la première ou la dernière lettre si on est au début ou à la fin du mot
+                if ($i === 0) {
+                    echo $_SESSION['premiereEtDerniereLettres'][$i] . ' ';
+                } elseif ($i === strlen($motAleatoire) - 1) {
+                    echo $_SESSION['premiereEtDerniereLettres'][1];
+                } elseif (in_array($motAleatoire[$i], $_SESSION['lettresTrouvees'])) {
+                    echo '<span style="color: orange;">' . $motAleatoire[$i] . '</span> ';
+                } else {
+                    echo '_ ';
+                }
             }
-        }
-    ?>
-</p>
-    <!-- </p> -->
+        ?>
+        </p>
     </div>
     <div class="d-flex justify-content-center">
         <?php if (isset($error)) : ?>
